@@ -6,6 +6,8 @@ import Display
 import Types
 import Data.IORef
 import Vector
+import MapLoader
+
 import qualified Data.Map as M
 
 import Texture
@@ -15,35 +17,46 @@ v = Vector3 0 0.577624445 0
 --v = Vector3 0 0 0
 --v = Vector3 0 0.75 0
 
+{-
 initialWorld texture = 
-  ([Planet {planetPos = Vector3 0 0 0, planetMass = 0.5, planetTexture = texture, planetRadius = 0.1}],
+  ([Planet {planetName = "Earth", planetPos = Vector3 0 0 0, planetMass = 0.5, planetTexture = texture, planetRadius = 0.1}],
    [],
    [Ship {shipPos = r, shipVelocity = v, shipTrail = []} | i <- [1..2]])
+-}
 --   Ship {shipPos = Vector3 0.5 0 0, shipV = Vector3 0 0.577624445 0, shipTrail = []}])
 
-main = do
-  (progname,texName:_) <- getArgsAndInitialize
+
+
+
+-- Setup window, graphics settings
+initWindow = do
   initialDisplayMode $= [DoubleBuffered, WithDepthBuffer]
   createWindow "Hello World"
   windowSize $= Size 800 800
   reshapeCallback $= Just reshape
 
   initParams
-  texture <- createTexture texName (True, True)
 
+  perWindowKeyRepeat $= PerWindowKeyRepeatOff
+
+
+main = do
+  (progname,mapName:_) <- getArgsAndInitialize
+  initWindow
+
+  initialWorld <- readMap mapName
+  world <- newIORef $ initialWorld
+
+  -- init keyboard stuff
+  keyState <- newIORef M.empty  -- stores currently pressed keyboard keys
+  zoom <- newIORef (1 :: GLfloat)
+  keyboardMouseCallback $= Just (keyboardMouse keyState zoom)
 
   timer <- initTimer
-  world <- newIORef $ initialWorld texture
-  keyState <- newIORef M.empty
-
-  zoom <- newIORef (1 :: GLfloat)
-  perWindowKeyRepeat $= PerWindowKeyRepeatOff
-  keyboardMouseCallback $= Just (keyboardMouse keyState zoom)
   idleCallback $= Just (idle world keyState timer)
 
   fps <- initFPS
   displayCallback $= (display world fps zoom)
-
 
   mainLoop
   where

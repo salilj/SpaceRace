@@ -3,6 +3,7 @@ import Graphics.UI.GLUT
 import Graphics.Rendering.OpenGL
 import Data.IORef
 import System.Posix.Clock
+
 type V = Vector3 GLdouble
 
 forward = SpecialKey KeyUp
@@ -11,8 +12,11 @@ left = SpecialKey KeyLeft
 right = SpecialKey KeyRight
 
 
-data Planet = Planet {planetPos :: V, planetTexture :: Maybe TextureObject, planetRadius :: GLdouble, planetMass :: GLdouble}
+data Planet = Planet {planetName :: String, planetPos :: V, planetTexture :: Maybe TextureObject, planetRadius :: GLdouble, planetMass :: GLdouble}
+  deriving Show
+
 data Ship = Ship {shipPos :: V, shipVelocity :: V, shipTrail :: [V]}
+  deriving (Show, Read, Eq)
 
 data Collision = Collision {collPos :: V, collVelocity :: V, collTime :: GLdouble} deriving Show
 newCol p v t = Collision {collPos = p, collVelocity = v, collTime = t}
