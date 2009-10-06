@@ -6,7 +6,7 @@ import Display
 import Types
 import Data.IORef
 import Vector
-import MapLoader
+import MapParser
 
 import qualified Data.Map as M
 

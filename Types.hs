@@ -15,7 +15,7 @@ right = SpecialKey KeyRight
 data Planet = Planet {planetName :: String, planetPos :: V, planetTexture :: Maybe TextureObject, planetRadius :: GLdouble, planetMass :: GLdouble}
   deriving Show
 
-data Ship = Ship {shipPos :: V, shipVelocity :: V, shipTrail :: [V]}
+data Ship = Ship {shipPos :: V, shipVelocity :: V, shipTrail :: [V], shipFuel :: GLdouble}
   deriving (Show, Read, Eq)
 
 data Collision = Collision {collPos :: V, collVelocity :: V, collTime :: GLdouble} deriving Show

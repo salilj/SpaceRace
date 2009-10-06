@@ -15,6 +15,7 @@ traceS a = trace (show a) a
 
 zero = Vector3 0 0 (0::GLdouble)
 
+-- Calculate acceleration by adding gravity due to all planets + acceleration due to thrusters, if applicable
 acceleration planets ks v s = 
   foldr (+) (Vector3 0 0 0) $ map acc planets
   where
@@ -37,12 +38,6 @@ acceleration planets ks v s =
 
         find k = M.findWithDefault False k ks
  
-updatePhysics' integrator t dt (Ship {shipPos = s, shipTrail = trail, shipVelocity = v}) =
-  if (floor $ (2*t)) > (floor $ 2*(t - dt))
-    then Ship {shipPos = s', shipVelocity = v', shipTrail = s':trail}
-    else Ship {shipPos = s', shipVelocity = v', shipTrail = trail}
-  where
-    (v',s') = integrator v s dt
 
 detectCollisions planets ships t = detectCollisions' ships t ([], [])
   where
@@ -70,6 +65,7 @@ detectCollisions planets ships t = detectCollisions' ships t ([], [])
         
         dir r =  planetPos planet - r - shipVelocity ship
 
+
 updatePhysics world keyState t dt
   |accumulator t < dt = return t
   |otherwise = do
@@ -78,4 +74,10 @@ updatePhysics world keyState t dt
     ks <- get keyState
     world $= (planets, collisions ++ collisions', map (updatePhysics' (rk4 $ acceleration planets ks) (time t) dt) ships')
     updatePhysics world keyState (t{time = time t + dt, accumulator = accumulator t - dt}) dt
-
+  where
+    updatePhysics' integrator t dt ship@(Ship {shipPos = s, shipTrail = trail, shipVelocity = v}) =
+      if (floor $ (2*t)) > (floor $ 2*(t - dt))
+        then ship{shipPos = s', shipVelocity = v', shipTrail = s':trail}
+        else ship{shipPos = s', shipVelocity = v', shipTrail = trail}
+      where
+        (v',s') = integrator v s dt

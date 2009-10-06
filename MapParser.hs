@@ -1,7 +1,8 @@
-module MapLoader (readMap) where
+module MapParser (readMap) where
 import Control.Monad
 import System.IO
 import Types
+import Texture
 import Graphics.Rendering.OpenGL
 
 import Text.ParserCombinators.Parsec.Perm
@@ -12,66 +13,69 @@ import Text.ParserCombinators.Parsec.Combinator
 import qualified Text.ParserCombinators.Parsec.Token as P
 
 data PlanetParse = PlanetName String | PlanetPos (Vector3 GLdouble) | Mass GLdouble | Radius GLdouble | TexName String
-data ShipParse = ShipPosition (Vector3 GLdouble) | ShipVelocity (Vector3 GLdouble)
-
-wspaces = many $ satisfy (\s -> if s == ' ' || s == '\t' then True else False)
+data ShipParse = ShipPosition (Vector3 GLdouble) | ShipVelocity (Vector3 GLdouble) | ShipFuel GLdouble
 
 glDoubleParser :: GenParser Char st GLdouble
 glDoubleParser = do
-  f <- P.float $ P.makeTokenParser emptyDef
-  return (fromRational $ toRational $ abs f) <?> "floating point value expected"
+  f <- P.naturalOrFloat $ P.makeTokenParser emptyDef
+  case f of
+    Left l -> return (fromIntegral $ abs l) 
+    Right r -> return (fromRational $ toRational $ abs r)
+  <?> "expected"
 
--- Parses (a,b,c) where each a,b,c is a floating point
+
+-- Parses (a,b,c) where each a,b,c is a GLdouble
 vectorParser = do
-  char '('
+  char '(' >> spaces
   a <- glDoubleParser
-  char ','
+  char ',' >> spaces
   b <- glDoubleParser
-  char ','
+  char ',' >> spaces
   c <- glDoubleParser
   char ')'
-  return (Vector3 a b c) <?> "expected (a,b,c) where a is a float"
+  return (Vector3 a b c) <?> "(<number>,<number>,<number>)"
 
 -- Parser key = value
 keyVal k kParser kCon = do
-  wspaces >> string k >> wspaces >> string "=" >> wspaces
+  spaces >> string k >> spaces >> string "=" >> spaces
   val <- kParser
-  wspaces
+  char ';'
+  spaces
   return $ kCon val
 
 -- Parses Planet: key1 = value1 key2 = value2 etc.. (space seperated)
 planetParser :: GenParser Char st (IO Planet)
 planetParser = do
-  string "Planet:" >> wspaces <?> "keyword Planet:"
-  p <- permute (buildPlanet <$$> keyVal "Name" (many1 alphaNum) PlanetName
-                       <||> keyVal "Texture" (many1 alphaNum) TexName
+  string "Planet:" >> spaces <?> "keyword Planet:"
+  p <- permute (buildPlanet <$$> keyVal "Name" (many1 $ noneOf [';']) PlanetName
+                       <||> keyVal "Texture" (many1 $ noneOf [';']) TexName
                        <||> keyVal "Mass" glDoubleParser Mass
                        <||> keyVal "Radius" glDoubleParser Radius
                        <||> keyVal "Position" vectorParser PlanetPos)
+  spaces
   return p
   where
     buildPlanet (PlanetName n) (TexName t) (Mass m) (Radius r) (PlanetPos p) = do
-      --texture <- createTexture tex (True, True) `catch` (\_ -> (putStrLn "Error reading texture: " ++  tex) >> return Nothing)
-      let texture = Nothing
+      texture <- createTexture t (True, True) `catch` (\e -> (putStrLn $ "Error: " ++ show e ++ " while reading texture: " ++ t) >> return Nothing)
       return Planet {planetName = n, planetTexture = texture, planetMass = m, planetRadius = r, planetPos = p}
 
 shipParser :: GenParser Char st Ship
 shipParser = do
-  string "Ship:" >> wspaces <?> "keyword Ship:"
+  string "Ship:" >> spaces <?> "keyword Ship:"
   p <- permute (buildPlanet <$$> keyVal "Position" vectorParser ShipPosition
-                       <||> keyVal "Velocity" vectorParser ShipVelocity)
+                       <||> keyVal "Velocity" vectorParser ShipVelocity
+                       <||> keyVal "Fuel" glDoubleParser ShipFuel)
+  spaces
   return p
   where
-    buildPlanet (ShipPosition p) (ShipVelocity v) = Ship {shipPos = p, shipVelocity = v, shipTrail = []}
+    buildPlanet (ShipPosition p) (ShipVelocity v) (ShipFuel f)= Ship {shipPos = p, shipVelocity = v, shipTrail = [], shipFuel=f}
 
-eol = wspaces >> char '\n' >> wspaces
 
--- One planet per line
+-- A ship, followed by at least one planet
 worldParser :: GenParser Char st (IO World)
 worldParser = do
-  s <- shipParser <?> "Ship Info Expected"
-  eol
-  p <- planetParser `sepBy1` eol <?> "At least one planet expected"
+  s <- shipParser <?> "Ship Info"
+  p <- ((many1 planetParser) <?> "At least one planet")
   return $ do
     p' <- sequence p
     return (p', [], [s])

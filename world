@@ -1,0 +1,2 @@
+Ship: Position = (0.5,0,0); Velocity = (0,0.57762445,0); Fuel = 100;
+Planet: Name = Earth; Position = (0,0,0); Radius = 0.1; Mass = 0.5; Texture = Textures/test6.rgb;
