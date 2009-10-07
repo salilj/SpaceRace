@@ -1,3 +1,4 @@
+{-# OPTIONS -fglasgow-exts #-}
 module Display where
 import Graphics.Rendering.OpenGL
 import Graphics.UI.GLUT
@@ -11,6 +12,9 @@ import Debug.Trace
 import Types
 import Physics
 import Vector
+
+import Foreign (malloc, free, Ptr)
+import Foreign.Storable
 
 
 qStyle = QuadricStyle (Just Smooth) GenerateTextureCoordinates Outside FillStyle
@@ -57,9 +61,11 @@ renderShip colorFun ship = do
   preservingMatrix $ do
     translate $ shipPos ship
     renderObject Solid (Sphere' (0.01::GLdouble) 100 100)
+    {-
     renderPrimitive Lines $ do
       vertex $ Vertex3 (0::GLdouble) 0 0
       vertex $ vector2vertex $ normalizeV $ shipVelocity ship
+      -}
   let n = length $ shipTrail ship
 
   mapM_ (\(v, i) -> preservingMatrix $ do
@@ -71,20 +77,6 @@ renderShip colorFun ship = do
       ) $ zip (shipTrail ship) ([1 - (fromIntegral i/ fromIntegral n) | i <- [1..n]] ::[GLfloat])
 
 vector2vertex (Vector3 a b c) = Vertex3 a b c
-
-pairs (a:b:l) = (a,b):(pairs (b:l))
-pairs [b] = [(b,b)]
-pairs [] = []
-
-plotIdeal ideal theta delta
-  |theta > 2 * pi = return ()
-  |otherwise = do
-    let r = ideal theta
-    let r' = ideal (theta + delta)
-    renderPrimitive Lines $ do
-      vertex $ Vertex3 (r * cos theta) (r * sin theta) 0
-      vertex $ Vertex3 (r' * cos (theta+delta)) (r' * sin (theta+delta)) 0
-    plotIdeal ideal (theta+delta) delta
 
 
 renderPlanet p = preservingMatrix $ do
@@ -111,44 +103,106 @@ renderScene world = do
   color $ Color3 1 1 (1::GLfloat)
   mapM_ renderPlanet planets
 
-  --plotIdeal ideal 0 0.01
-  rasterPos $ Vertex3 0 (-1) (0::GLfloat)
-
   mapM_ (\(o, (r,g,b)) -> renderShip (\c -> Color3 (c*r) (c*g) (c*b)) o) $ zip ships randomColors
   where
     vel s = normalizeV $ shipVelocity s
     randomColors = map normalizeV $ group3 $ map (fromRational . toRational) $ randomRs (0, 1::Float) (mkStdGen 1)
     group3 (a:b:c:l) = (a, b, c):(group3 l)
 
+hudOffset = 30
 
-renderMiniMap world = preservingMatrix $ do
+readPixelZ x y = do
+  buf <- malloc :: IO (Ptr GLdouble)
+  readPixels (Position x  y) (Size 1 1) (PixelData DepthComponent Double buf)
+  p <- peek buf
+  free buf
+  return p
+
+renderMiniMap w h world = preservingMatrix $ do
+ 
+  color $ Color3 0 0 (0 :: GLfloat)
+  renderPrimitive Quads $ do
+    vertex $ Vertex2 (-w) (-h)
+    vertex $ Vertex2 (-w) h
+    vertex $ Vertex2 w h
+    vertex $ Vertex2 w (-h)
   (planets, _,ships) <- get world
-  rasterPos $ Vertex2 10 (10::GLfloat)
+  let scalf = scaleFactor planets
 
-  translate $ Vector3 100 (100::GLfloat) 0
-  color $ Color3 1 1 (1::GLfloat)
+  color $ Color3 1 1 (1::GLdouble)
   mapM_ (\p -> preservingMatrix $ do
     translate $ k .* planetPos p
     case planetTexture p of
       Nothing -> renderQuadric qStyle (Disk 0 5 5 5)
       Just tex -> do
         textureBinding Texture2D $= Just tex
-        renderQuadric qStyle (Disk 0 5 10 10)
+        renderQuadric qStyle (Disk 0 (k * planetRadius p) 10 10)
         textureBinding Texture2D $= Nothing
     ) planets
 
   color $ Color3 1 0 (0::GLfloat)
   mapM_ (\p -> preservingMatrix $ do
-    translate $ k .* shipPos p
+    let Vector3 x y z = k .* shipPos p
+    translate $ Vector3 (clamp x (-w/2) (w/2)) (clamp y (-h/2) (h/2)) z
     renderQuadric qStyle (Disk 0 2 5 5)
     ) ships
-  rasterPos $ Vertex2 (-100::GLfloat) (-90)
-  case ships of
-    s:_ -> renderString Helvetica10 ("Velocity : " ++ show (norm $ shipVelocity $ s))
-    _ -> return ()
   where
-    k = 50
-  
+    clamp a low high = if a < low then low else if a > high then high else a
+    scaleFactor planets = if dif == 0 then 1 else 200/dif
+      where
+        dif = max (maxx - minx) (maxy - miny)
+        max a b = if a > b then a else b
+        min a b = if a < b then a else b
+        (minx,miny,maxx,maxy) = foldr (\p (minx, miny, maxx,maxy) -> 
+              let (Vector3 x y _) = planetPos p 
+                  minx' = min x minx
+                  miny' = min y miny
+                  maxx' = max x maxx
+                  maxy' = max y maxy
+              in (minx', miny',maxx',maxy')) (0,0,0,0) planets
+    k = h/2
+
+
+setupMiniMap w h world = do
+  viewport $= (Position 0 0, Size w (h + hudOffset))
+  matrixMode $= Modelview 0
+  loadIdentity
+  matrixMode $= Projection
+  loadIdentity
+  ortho2D 0 w' 0 (h' + hudOffset')
+
+  textureBinding Texture2D $= ?glassTex
+  renderPrimitive Quads $ do
+    texCoord $ TexCoord2 0 (1::GLdouble)
+    vertex $ Vertex2 0 (0::GLdouble)
+    texCoord $ TexCoord2 0 (0::GLdouble)
+    vertex $ Vertex2 0 (h'+hudOffset')
+    texCoord $ TexCoord2 1 (0::GLdouble)
+    vertex $ Vertex2 w' (h'+hudOffset')
+    texCoord $ TexCoord2 1 (1::GLdouble)
+    vertex $ Vertex2 w' 0
+    
+  textureBinding Texture2D $= Nothing
+
+  translate $ Vector3 (w'/2) ((h' - 6)/2 + hudOffset'::GLdouble) 0
+  scissor $= Just (Position 3 hudOffset, Size (w - 6) (h - 6))
+
+  renderMiniMap (w' - 12) (h' - 6) world
+
+  scissor $= Nothing
+
+  (_,_,ships) <- get world
+  case ships of
+    [] -> return ()
+    s:_ -> do
+      rasterPos $ Vertex2 (-w'/2 + 3) (-h'/2 - 8)
+      renderString Helvetica10 ("Velocity : " ++ show (norm $ shipVelocity $ s))
+      rasterPos $ Vertex2 (-w'/2 + 3) (-h'/2 - 19)
+      renderString Helvetica10 ("Fuel : " ++ (show $ shipFuel s))
+  where
+    hudOffset' = fromIntegral hudOffset
+    w' = fromIntegral $ w
+    h' = fromIntegral $ h
 
 display world fps zoom = do 
   clear [ColorBuffer]
@@ -159,15 +213,13 @@ display world fps zoom = do
   loadIdentity
   perspective 45 (fromIntegral w/ fromIntegral h) 1 500
   translate $ Vector3 0 0 (-5 :: GLfloat)
-  rotate 15 $ Vector3 (1::GLfloat) 0 0
+  scaleScreen s
+
   get zoom >>= \z -> scale z z z
+
   renderScene world
 
-  viewport $= (Position 0 0, Size 200 200)
-  matrixMode $= Projection
-  loadIdentity
-  ortho2D 0 (fromIntegral 200) 0 (fromIntegral 200)
-  renderMiniMap world
+  setupMiniMap (w `div` 5) (h `div` 5) world
 
   t <- currentTime
   f <- get fps
@@ -179,9 +231,16 @@ display world fps zoom = do
     False -> do
       fps $= f{fpsFrames = fpsFrames f + 1}
 
-  displayFPS
+  --displayFPS
   swapBuffers
   where
+    scaleScreen s = do
+      zval <- readPixelZ 0 0
+      (proj :: GLmatrix GLdouble) <- liftM get matrix $ Just Projection
+      mdl <- liftM get matrix $ Just $ Modelview 0
+      Vertex3 x y z <- unProject (Vertex3 0 0 zval) proj mdl (Position 0 0, s)
+      scale (0.845 / abs y) (0.845 / abs y) (0.845 / abs y) --figure out why this works
+
     displayFPS = do
       f <- get fps
       color $ Color3 1 1 (1::GLfloat)
@@ -199,3 +258,10 @@ idle world keyState timer = do
   where
     acc t newT = accumulator t + newT - oldTime t
 
+  {-
+  renderPrimitive Points $ do
+    vertex $ Vertex3 0 0 (0::GLfloat)
+    vertex $ Vertex3 0 (-0.5) (0::GLfloat)
+    vertex $ Vertex3 1 (-1) (0::GLfloat)
+    vertex $ Vertex3 1 0 (0::GLfloat)
+    -}

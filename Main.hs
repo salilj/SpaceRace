@@ -17,22 +17,13 @@ v = Vector3 0 0.577624445 0
 --v = Vector3 0 0 0
 --v = Vector3 0 0.75 0
 
-{-
-initialWorld texture = 
-  ([Planet {planetName = "Earth", planetPos = Vector3 0 0 0, planetMass = 0.5, planetTexture = texture, planetRadius = 0.1}],
-   [],
-   [Ship {shipPos = r, shipVelocity = v, shipTrail = []} | i <- [1..2]])
--}
---   Ship {shipPos = Vector3 0.5 0 0, shipV = Vector3 0 0.577624445 0, shipTrail = []}])
-
-
-
 
 -- Setup window, graphics settings
 initWindow = do
   initialDisplayMode $= [DoubleBuffered, WithDepthBuffer]
   createWindow "Hello World"
-  windowSize $= Size 800 800
+  windowSize $= Size 600 600
+  fullScreen
   reshapeCallback $= Just reshape
 
   initParams
@@ -43,6 +34,12 @@ initWindow = do
 main = do
   (progname,mapName:_) <- getArgsAndInitialize
   initWindow
+
+  gT <- createTexture "Textures/glass.png" (False, False)
+
+  let ?glassTex = case gT of 
+                    Nothing -> error "Could not load glass texture"
+                    Just _ -> gT
 
   initialWorld <- readMap mapName
   world <- newIORef $ initialWorld

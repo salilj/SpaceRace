@@ -23,6 +23,9 @@ module Texture where
 import Graphics.UI.GLUT
 import ReadImage (readImage)
 import Monad (when)
+import Foreign (mallocBytes, copyArray)
+import Data.Array.Storable
+import Codec.Image.PNG
 
 
 {-
@@ -50,6 +53,19 @@ initParams = do
   hint TextureCompression $= Nicest
   --ortho 0.0 (fromIntegral x) 0.0 (fromIntegral y) (-1.0) (1.0)  -- this is somewhat of a hack.  Think of it as defining how many pixels large the screen is.
 
+readPNG filename = do
+  f <- loadPNGFile filename
+  case f of
+    Left e -> error $ "Could not load: " ++ filename ++ " error: " ++ e
+    Right img -> do
+      let (w,h) = dimensions img
+      let imgdata = imageData img
+      (_,(x,y)) <- getBounds imgdata
+      buf <- mallocBytes $ (x+1)*(y+1)
+      withStorableArray (imageData img) (\ptr -> copyArray buf ptr $ (x+1)*(y+1))
+
+      return (Size (fromIntegral w) (fromIntegral h), PixelData RGBA UnsignedByte buf)
+
 
 {-
 This function provides a way to load a raw image file into memory.  If the load fails, this function will return Nothing.
@@ -63,6 +79,9 @@ createTexture filename (repeatX, repeatY) = do
 	when repeatX (textureWrapMode Texture2D S $= (Repeated, Repeat))  -- define wrapping along the x axis.
 	when repeatY (textureWrapMode Texture2D T $= (Repeated, Repeat))  -- define wrapping along the y axis.
 	textureFilter Texture2D $= ((Linear', Nothing), Linear')  -- ?  This is necessary, but I don't know what it does.
-	((Size x y), pixels) <- readImage filename  -- read our image into a PixelData structure.
+
+	((Size x y), pixels) <- case take 3 $ reverse filename of 
+                                  "gnp" -> readPNG filename
+                                  _ -> readImage filename  -- read our image into a PixelData structure.
 	texImage2D Nothing NoProxy 0 RGBA' (TextureSize2D x y) 0 pixels  -- associate our image with our new texture.  Since we are dealing with sprites, we do not wish to create mipmaps.
 	return (Just texName)  -- return our (Maybe TextureObject) for later use.
