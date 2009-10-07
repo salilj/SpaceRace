@@ -9,6 +9,7 @@ qStyle = QuadricStyle (Just Smooth) GenerateTextureCoordinates Outside FillStyle
 
 vector2vertex (Vector3 a b c) = Vertex3 a b c
 
+-- Figure out z in object coords of a point in screen coords. Used for unProject
 readPixelZ x y = do
   buf <- malloc :: IO (Ptr GLdouble)
   readPixels (Position x  y) (Size 1 1) (PixelData DepthComponent Double buf)

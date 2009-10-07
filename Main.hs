@@ -12,11 +12,6 @@ import qualified Data.Map as M
 
 import Texture
 
-r = Vector3 0.5 0 0
-v = Vector3 0 0.577624445 0
---v = Vector3 0 0 0
---v = Vector3 0 0.75 0
-
 
 -- Setup window, graphics settings
 initWindow = do

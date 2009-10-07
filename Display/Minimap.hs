@@ -10,17 +10,22 @@ import Display.Utils
 hudOffset = 30
 hudOffset' = fromIntegral hudOffset
 
-renderMiniMap w h world = preservingMatrix $ do
- 
+-- Black background for minimap
+renderBlackBox = do
   color $ Color3 0 0 (0 :: GLfloat)
   renderPrimitive Quads $ do
     vertex $ Vertex2 (-w) (-h)
     vertex $ Vertex2 (-w) h
     vertex $ Vertex2 w h
     vertex $ Vertex2 w (-h)
+
+renderMiniMap w h world = preservingMatrix $ do
+  renderBlackBox
+ 
   (planets, _,ships) <- get world
   let scalf = scaleFactor planets
 
+  -- Planets
   color $ Color3 1 1 (1::GLdouble)
   mapM_ (\p -> preservingMatrix $ do
     translate $ k .* planetPos p
@@ -32,6 +37,7 @@ renderMiniMap w h world = preservingMatrix $ do
         textureBinding Texture2D $= Nothing
     ) planets
 
+  -- Ships
   color $ Color3 1 0 (0::GLfloat)
   mapM_ (\p -> preservingMatrix $ do
     let Vector3 x y z = k .* shipPos p
@@ -40,6 +46,8 @@ renderMiniMap w h world = preservingMatrix $ do
     ) ships
   where
     clamp a low high = if a < low then low else if a > high then high else a
+
+    -- Used to fit all the planets into the minimap
     scaleFactor planets = if dif == 0 then 1 else 200/dif
       where
         dif = max (maxx - minx) (maxy - miny)
@@ -55,6 +63,7 @@ renderMiniMap w h world = preservingMatrix $ do
     k = h/2
 
 
+-- Minimap + HUD data is drawn on top of this rectangle
 renderGlass w h = do
   textureBinding Texture2D $= ?glassTex
   renderPrimitive Quads $ do
@@ -68,6 +77,8 @@ renderGlass w h = do
     vertex $ Vertex2 w 0
   textureBinding Texture2D $= Nothing
 
+
+-- Setup ortho projection, display glass UI, setup scissor for actual minimap, then draw HUD data
 displayMiniMap w h world = do
   viewport $= (Position 0 0, Size w (h + hudOffset))
   clearMatrices

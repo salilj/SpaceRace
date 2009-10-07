@@ -58,7 +58,6 @@ renderScene world = do
   col' <- liftM catMaybes $ mapM renderCollision collisions
   world $= (planets, col', ships)
 
-
   color $ Color3 1 1 (1::GLfloat)
   mapM_ renderPlanet planets
 
@@ -69,16 +68,16 @@ renderScene world = do
     group3 (a:b:c:l) = (a, b, c):(group3 l)
 
 
+
+-- may not be needed
 reshape s@(Size w h) = do 
   viewport $= (Position 0 0, s)
   matrixMode $= Projection
   loadIdentity
   perspective 45 (fromIntegral w/ fromIntegral h) 1 500
 
-display world fps zoom = do 
-  clear [ColorBuffer]
-  s@(Size w h) <- get windowSize
 
+displayScene world fps zoom screenSize = do
   viewport $= (Position 0 0, s)
   clearMatrices
   perspective 45 (fromIntegral w/ fromIntegral h) 1 500
@@ -88,12 +87,6 @@ display world fps zoom = do
   get zoom >>= \z -> scale z z z
 
   renderScene world
-
-  displayMiniMap (w `div` 5) (h `div` 5) world
-
-  updateFPS fps
-  --displayFPS
-  swapBuffers
   where
     scaleScreen s = do
       zval <- readPixelZ 0 0
@@ -102,6 +95,17 @@ display world fps zoom = do
       Vertex3 x y z <- unProject (Vertex3 0 0 zval) proj mdl (Position 0 0, s)
       scale (0.845 / abs y) (0.845 / abs y) (0.845 / abs y) --the number is probably a function of the perspective transformation
 
+
+display world fps zoom = do 
+  clear [ColorBuffer]
+  s@(Size w h) <- get windowSize
+
+  displayScene world fps zoom s
+  displayMiniMap (w `div` 5) (h `div` 5) world
+
+  updateFPS fps
+  swapBuffers
+  where
     displayFPS = do
       f <- get fps
       color $ Color3 1 1 (1::GLfloat)
