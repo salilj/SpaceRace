@@ -81,3 +81,4 @@ updatePhysics world keyState t dt
         else ship{shipPos = s', shipVelocity = v', shipTrail = trail}
       where
         (v',s') = integrator v s dt
+

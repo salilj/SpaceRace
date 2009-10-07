@@ -1,14 +1,7 @@
 module Bindings where
 import Graphics.Rendering.OpenGL
 import Graphics.UI.GLUT
-import Display
 import qualified Data.Map as M
-
-reshape s@(Size w h) = do 
-  viewport $= (Position 0 0, s)
-  matrixMode $= Projection
-  loadIdentity
-  perspective 45 (fromIntegral w/ fromIntegral h) 1 500
 
 keyboardAct keyState zoom k@(SpecialKey _) Up = do
   ks <- get keyState

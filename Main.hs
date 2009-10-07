@@ -2,7 +2,7 @@
 import Graphics.Rendering.OpenGL
 import Graphics.UI.GLUT
 import Bindings
-import Display
+import Display.Core
 import Types
 import Data.IORef
 import Vector
