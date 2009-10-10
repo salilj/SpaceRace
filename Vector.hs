@@ -17,6 +17,7 @@ instance (Num a) => Num (Vector3 a) where
   negate (Vector3 x y z) = Vector3 (-x) (-y) (-z)
 
   (Vector3 a b c) * (Vector3 x y z) = Vector3 (b*z - c*y) (-a*z + c*x) (a*y - b*x)
+  fromInteger n = let n' = fromInteger n in Vector3 n' n' n'
  
 
 instance (Floating s, Num (Vector3 s)) => Vector (Vector3 s) s where

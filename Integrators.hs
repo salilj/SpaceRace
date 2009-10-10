@@ -5,7 +5,7 @@ import Types
 
 type Integrator = (V -> V -> V) -> V -> V -> GLdouble -> (V, V)
 
--- Most of these are useless. rk4 is good of course, but reOrderedEuler is also OK. preScaledEuler is so bad that the implementation is probably incorrect
+-- Most of these are useless. rk4 is good of course, but reorderedEuler is also OK. preScaledEuler is so bad that the implementation is probably incorrect
 
 euler :: Integrator
 euler acceleration v s dt = 
@@ -26,8 +26,8 @@ preScaledEuler acceleration v s dt =
     v' = v + (dt * dt) .* a
     a = acceleration v s
 
-reOrderedEuler :: Integrator
-reOrderedEuler acceleration v s dt = 
+reorderedEuler :: Integrator
+reorderedEuler acceleration v s dt = 
   (v', s + dt .* v')
   where 
     a = acceleration v s

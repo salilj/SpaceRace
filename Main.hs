@@ -44,11 +44,13 @@ main = do
   zoom <- newIORef (1 :: GLfloat)
   keyboardMouseCallback $= Just (keyboardMouse keyState zoom)
 
+  screenInfo <- newIORef (0 :: V, 0 :: V)
+
   timer <- initTimer
-  idleCallback $= Just (idle world keyState timer)
+  idleCallback $= Just (idle world keyState timer screenInfo)
 
   fps <- initFPS
-  displayCallback $= (display world fps zoom)
+  displayCallback $= (display world fps zoom screenInfo)
 
   mainLoop
   where

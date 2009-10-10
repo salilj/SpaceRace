@@ -11,8 +11,6 @@ import Display.Minimap
 import Display.Utils
 import Display.Collision
 
-import Debug.Trace
-
 import Types
 import Physics
 import Vector
@@ -77,7 +75,7 @@ reshape s@(Size w h) = do
   perspective 45 (fromIntegral w/ fromIntegral h) 1 500
 
 
-displayScene world fps zoom screenSize@(Size w h) = do
+displayScene world fps zoom screenSize@(Size w h) screenPos@(Vector3 x y _) = do
   viewport $= (Position 0 0, screenSize)
   clearMatrices
   perspective 45 (fromIntegral w/ fromIntegral h) 1 500
@@ -86,6 +84,7 @@ displayScene world fps zoom screenSize@(Size w h) = do
 
   get zoom >>= \z -> scale z z z
 
+  translate $ (-1) .* Vector3 x y 0
   renderScene world
   where
     scaleScreen s = do
@@ -96,14 +95,16 @@ displayScene world fps zoom screenSize@(Size w h) = do
       scale (0.845 / abs y) (0.845 / abs y) (0.845 / abs y) --the number is probably a function of the perspective transformation
 
 
-display world fps zoom = do 
+display world fps zoom screenInfo = do 
   clear [ColorBuffer]
   s@(Size w h) <- get windowSize
 
-  displayScene world fps zoom s
+  (screenPos, _) <- get screenInfo
+  displayScene world fps zoom s screenPos
   displayMiniMap (w `div` 5) (h `div` 5) world
 
   updateFPS fps
+  displayFPS
   swapBuffers
   where
     displayFPS = do
@@ -113,12 +114,39 @@ display world fps zoom = do
       renderString Helvetica10 $ "FPS : " ++ (show $ fpsFPS f)
 
 
-idle world keyState timer = do
+-- all these assumptions of the first ship being 'the one' are wrong...
+-- clamp the screen movement to prevent the ship from going off-screen if its very fast
+updateScreen (screenPos, screenVelocity) w h (s:_) t = 
+  case atEdge s && movingOut s of
+    False -> if norm screenVelocity < 0.001 then (screenPos', Vector3 0 0 0) else (screenPos', 0.91 .* screenVelocity)
+    True -> (screenPos + (20 * t) .* shipVelocity s, 18 .* shipVelocity s)
+  where
+    screenPos' = screenPos + (t .* screenVelocity)
+
+    Vector3 x' y' _ = shipPos s - screenPos + (t .* shipVelocity s)
+    Vector3 x y _ = shipPos s - screenPos
+
+    movingOut s = abs x' > abs x || abs y' > abs y
+    atEdge s = abs y > 0.99 || abs x > 0.99 * w/h
+
+updateScreen s _ _ _ _ = s
+
+
+idle world keyState timer screenInfo = do
   t <- get timer
   newTime <- currentTime
-  t' <- updatePhysics world keyState (t{accumulator = acc t newTime, oldTime = newTime}) timeStep
+
+  wrld <- get world
+  ks <- get keyState
+  let (world'@(_,_,ships), t') = updatePhysics wrld ks (t{accumulator = acc t newTime, oldTime = newTime}) timeStep
+
+  --move screen to prevent ship from going past the edges
+  s@(Size w h) <- get windowSize
+  sinfo <- get screenInfo
+  screenInfo $= updateScreen sinfo (fromIntegral w) (fromIntegral h) ships (newTime - oldTime t)
 
   timer $= t'
+  world $= world'
   postRedisplay Nothing
   where
     acc t newT = accumulator t + newT - oldTime t

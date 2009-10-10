@@ -66,15 +66,15 @@ detectCollisions planets ships t = detectCollisions' ships t ([], [])
         dir r =  planetPos planet - r - shipVelocity ship
 
 
-updatePhysics world keyState t dt
-  |accumulator t < dt = return t
-  |otherwise = do
-    (planets, collisions, ships) <- get world
-    let (collisions', ships') = detectCollisions planets ships t
-    ks <- get keyState
-    world $= (planets, collisions ++ collisions', map (updatePhysics' (rk4 $ acceleration planets ks) (time t) dt) ships')
-    updatePhysics world keyState (t{time = time t + dt, accumulator = accumulator t - dt}) dt
+updatePhysics world@(planets, collisions, ships) keyState t dt
+  |accumulator t < dt = (world, t)
+  |otherwise = 
+    updatePhysics world' keyState (t{time = time t + dt, accumulator = accumulator t - dt}) dt
   where
+    world' = (planets, collisions ++ collisions', map updateShipPos ships')
+    updateShipPos = (updatePhysics' (rk4 $ acceleration planets keyState) (time t) dt)
+
+    (collisions', ships') = detectCollisions planets ships t
     updatePhysics' integrator t dt ship@(Ship {shipPos = s, shipTrail = trail, shipVelocity = v}) =
       if (floor $ (2*t)) > (floor $ 2*(t - dt))
         then ship{shipPos = s', shipVelocity = v', shipTrail = s':trail}
