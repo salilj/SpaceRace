@@ -11,7 +11,7 @@ hudOffset = 30
 hudOffset' = fromIntegral hudOffset
 
 -- Black background for minimap
-renderBlackBox = do
+renderBlackBox w h = do
   color $ Color3 0 0 (0 :: GLfloat)
   renderPrimitive Quads $ do
     vertex $ Vertex2 (-w) (-h)
@@ -20,7 +20,7 @@ renderBlackBox = do
     vertex $ Vertex2 w (-h)
 
 renderMiniMap w h world = preservingMatrix $ do
-  renderBlackBox
+  renderBlackBox w h
  
   (planets, _,ships) <- get world
   let scalf = scaleFactor planets

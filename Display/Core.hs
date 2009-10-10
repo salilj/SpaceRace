@@ -77,12 +77,12 @@ reshape s@(Size w h) = do
   perspective 45 (fromIntegral w/ fromIntegral h) 1 500
 
 
-displayScene world fps zoom screenSize = do
-  viewport $= (Position 0 0, s)
+displayScene world fps zoom screenSize@(Size w h) = do
+  viewport $= (Position 0 0, screenSize)
   clearMatrices
   perspective 45 (fromIntegral w/ fromIntegral h) 1 500
   translate $ Vector3 0 0 (-5 :: GLfloat)
-  scaleScreen s
+  scaleScreen screenSize
 
   get zoom >>= \z -> scale z z z
 

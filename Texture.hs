@@ -21,7 +21,6 @@ The above copyright notice only applies to the Sprites and Main modules containe
 
 module Texture where
 import Graphics.UI.GLUT
-import ReadImage (readImage)
 import Monad (when)
 import Foreign (mallocBytes, copyArray)
 import Data.Array.Storable
@@ -63,8 +62,8 @@ readPNG filename = do
       (_,(x,y)) <- getBounds imgdata
       buf <- mallocBytes $ (x+1)*(y+1)
       withStorableArray (imageData img) (\ptr -> copyArray buf ptr $ (x+1)*(y+1))
-
-      return (Size (fromIntegral w) (fromIntegral h), PixelData RGBA UnsignedByte buf)
+      return (Size (fromIntegral w) (fromIntegral h), 
+              PixelData (if hasAlphaChannel img then RGBA else RGB) UnsignedByte buf)
 
 
 {-
@@ -80,8 +79,6 @@ createTexture filename (repeatX, repeatY) = do
 	when repeatY (textureWrapMode Texture2D T $= (Repeated, Repeat))  -- define wrapping along the y axis.
 	textureFilter Texture2D $= ((Linear', Nothing), Linear')  -- ?  This is necessary, but I don't know what it does.
 
-	((Size x y), pixels) <- case take 3 $ reverse filename of 
-                                  "gnp" -> readPNG filename
-                                  _ -> readImage filename  -- read our image into a PixelData structure.
+	((Size x y), pixels) <- readPNG filename
 	texImage2D Nothing NoProxy 0 RGBA' (TextureSize2D x y) 0 pixels  -- associate our image with our new texture.  Since we are dealing with sprites, we do not wish to create mipmaps.
 	return (Just texName)  -- return our (Maybe TextureObject) for later use.
